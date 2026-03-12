@@ -78,11 +78,11 @@ final class FloatingPillWindow: NSPanel {
         let screenFrame = screen.visibleFrame
 
         // Large enough for the setup state (the biggest view)
-        let windowWidth: CGFloat = 320
-        let windowHeight: CGFloat = 220
+        let windowWidth: CGFloat = 340
+        let windowHeight: CGFloat = 210
         let windowFrame = NSRect(
             x: screenFrame.midX - windowWidth / 2,
-            y: screenFrame.maxY - windowHeight - 8,
+            y: screenFrame.maxY - windowHeight - 6,
             width: windowWidth,
             height: windowHeight
         )
