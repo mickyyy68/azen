@@ -3,6 +3,7 @@ import Combine
 
 enum SessionState {
     case idle
+    case setup
     case active
     case paused
     case completed
@@ -21,6 +22,30 @@ final class FocusSessionManager: ObservableObject {
         let minutes = Int(timeRemaining) / 60
         let seconds = Int(timeRemaining) % 60
         return String(format: "%d:%02d", minutes, seconds)
+    }
+
+    func showSetup() {
+        guard state == .idle else { return }
+        state = .setup
+    }
+
+    func dismissSetup() {
+        guard state == .setup else { return }
+        state = .idle
+        taskName = ""
+    }
+
+    func beginNewTask() {
+        taskName = ""
+        totalDuration = 0
+        timeRemaining = 0
+        state = .setup
+    }
+
+    func beginContinue() {
+        totalDuration = 0
+        timeRemaining = 0
+        state = .setup
     }
 
     func start(task: String, duration: TimeInterval) {

@@ -6,7 +6,6 @@ struct aZenApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     var body: some Scene {
-        // All UI is managed by AppDelegate (menu bar + pill window)
         Settings { EmptyView() }
     }
 }
@@ -14,7 +13,6 @@ struct aZenApp: App {
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
-    private var popover: NSPopover!
     private var pillWindow: FloatingPillWindow?
     private let sessionManager = FocusSessionManager()
     private let hotkeyManager = HotkeyManager()
@@ -22,7 +20,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         setupStatusItem()
-        setupPopover()
         setupPillWindow()
         setupHotkey()
         observeSessionState()
@@ -34,30 +31,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = statusItem.button {
             button.image = NSImage(systemSymbolName: "scope", accessibilityDescription: "aZen")
-            button.action = #selector(togglePopover)
-            button.target = self
         }
+
+        let menu = NSMenu()
+        menu.addItem(withTitle: "Open aZen (⌘⇧F)", action: #selector(openIsland), keyEquivalent: "")
+        menu.addItem(.separator())
+        menu.addItem(withTitle: "Quit", action: #selector(quitApp), keyEquivalent: "q")
+        statusItem.menu = menu
     }
 
-    // MARK: - Popover
-
-    private func setupPopover() {
-        popover = NSPopover()
-        popover.contentSize = NSSize(width: 300, height: 280)
-        popover.behavior = .transient
-        popover.contentViewController = NSHostingController(
-            rootView: MenuBarPopover(sessionManager: sessionManager)
-        )
+    @objc private func openIsland() {
+        toggleIsland()
     }
 
-    @objc private func togglePopover() {
-        guard let button = statusItem.button else { return }
-        if popover.isShown {
-            popover.performClose(nil)
-        } else {
-            popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-            NSApp.activate(ignoringOtherApps: true)
-        }
+    @objc private func quitApp() {
+        NSApp.terminate(nil)
     }
 
     // MARK: - Pill Window
@@ -71,10 +59,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func setupHotkey() {
         hotkeyManager.onHotkey = { [weak self] in
             Task { @MainActor in
-                self?.togglePopover()
+                self?.toggleIsland()
             }
         }
         hotkeyManager.register()
+    }
+
+    private func toggleIsland() {
+        switch sessionManager.state {
+        case .idle:
+            sessionManager.showSetup()
+        case .setup:
+            sessionManager.dismissSetup()
+        case .active, .paused:
+            // During focus, hotkey does nothing (or could pause — keep simple for v1)
+            break
+        case .completed:
+            // Already showing completed state, no action needed
+            break
+        }
     }
 
     // MARK: - State Observation
@@ -85,7 +88,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .sink { [weak self] state in
                 guard let self else { return }
                 switch state {
-                case .active, .paused, .completed:
+                case .setup, .active, .paused, .completed:
                     self.pillWindow?.positionAtTopCenter()
                     self.pillWindow?.orderFront(nil)
                 case .idle:
@@ -97,12 +100,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func updateStatusIcon(state: SessionState) {
-        let symbolName = state == .idle ? "scope" : "scope"
-        let config = NSImage.SymbolConfiguration(pointSize: 14, weight: .medium)
-        var image = NSImage(systemSymbolName: symbolName, accessibilityDescription: "aZen")
-        if state != .idle {
-            let filledConfig = config.applying(.init(paletteColors: [.controlAccentColor]))
-            image = image?.withSymbolConfiguration(filledConfig)
+        var image = NSImage(systemSymbolName: "scope", accessibilityDescription: "aZen")
+        if state != .idle && state != .setup {
+            let config = NSImage.SymbolConfiguration(pointSize: 14, weight: .medium)
+                .applying(.init(paletteColors: [.controlAccentColor]))
+            image = image?.withSymbolConfiguration(config)
         }
         statusItem.button?.image = image
     }
