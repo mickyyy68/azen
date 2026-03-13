@@ -94,9 +94,23 @@ struct HotkeyConfig {
     }
 }
 
+// Carbon event callback for global hot key — must be a free function (no captures)
+private func carbonHotKeyHandler(
+    _: EventHandlerCallRef?,
+    _: EventRef?,
+    _ userData: UnsafeMutableRawPointer?
+) -> OSStatus {
+    guard let userData else { return OSStatus(eventNotHandledErr) }
+    let manager = Unmanaged<HotkeyManager>.fromOpaque(userData).takeUnretainedValue()
+    DispatchQueue.main.async {
+        manager.onHotkey?()
+    }
+    return noErr
+}
+
 final class HotkeyManager {
-    private var globalMonitor: Any?
-    private var localMonitor: Any?
+    private var hotKeyRef: EventHotKeyRef?
+    private var eventHandlerRef: EventHandlerRef?
     private(set) var config: HotkeyConfig
 
     var onHotkey: (() -> Void)?
@@ -107,25 +121,43 @@ final class HotkeyManager {
     }
 
     func register() {
-        globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            self?.handleKeyEvent(event)
-        }
-        localMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            if self?.handleKeyEvent(event) == true {
-                return nil
-            }
-            return event
-        }
+        var eventType = EventTypeSpec(
+            eventClass: OSType(kEventClassKeyboard),
+            eventKind: UInt32(kEventHotKeyPressed)
+        )
+
+        let selfPtr = Unmanaged.passUnretained(self).toOpaque()
+        InstallEventHandler(
+            GetEventDispatcherTarget(),
+            carbonHotKeyHandler,
+            1,
+            &eventType,
+            selfPtr,
+            &eventHandlerRef
+        )
+
+        let hotKeyID = EventHotKeyID(
+            signature: OSType(0x615A_656E), // "aZen"
+            id: UInt32(1)
+        )
+        RegisterEventHotKey(
+            UInt32(config.keyCode),
+            carbonModifiers(from: config.modifiers),
+            hotKeyID,
+            GetEventDispatcherTarget(),
+            OptionBits(0),
+            &hotKeyRef
+        )
     }
 
     func unregister() {
-        if let globalMonitor {
-            NSEvent.removeMonitor(globalMonitor)
-            self.globalMonitor = nil
+        if let hotKeyRef {
+            UnregisterEventHotKey(hotKeyRef)
+            self.hotKeyRef = nil
         }
-        if let localMonitor {
-            NSEvent.removeMonitor(localMonitor)
-            self.localMonitor = nil
+        if let eventHandlerRef {
+            RemoveEventHandler(eventHandlerRef)
+            self.eventHandlerRef = nil
         }
     }
 
@@ -137,16 +169,12 @@ final class HotkeyManager {
         onConfigChanged?()
     }
 
-    @discardableResult
-    private func handleKeyEvent(_ event: NSEvent) -> Bool {
-        let relevantModifiers: NSEvent.ModifierFlags = [.command, .shift, .option, .control]
-        let eventMods = event.modifierFlags.intersection(relevantModifiers)
-        let configMods = config.modifiers.intersection(relevantModifiers)
-
-        if event.keyCode == config.keyCode && eventMods == configMods {
-            onHotkey?()
-            return true
-        }
-        return false
+    private func carbonModifiers(from flags: NSEvent.ModifierFlags) -> UInt32 {
+        var mods: UInt32 = 0
+        if flags.contains(.command) { mods |= UInt32(cmdKey) }
+        if flags.contains(.option) { mods |= UInt32(optionKey) }
+        if flags.contains(.control) { mods |= UInt32(controlKey) }
+        if flags.contains(.shift) { mods |= UInt32(shiftKey) }
+        return mods
     }
 }
