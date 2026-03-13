@@ -37,7 +37,7 @@ struct DynamicIslandView: View {
         switch sessionManager.state {
         case .idle: return CGSize(width: 120, height: 36)
         case .setup: return CGSize(width: 320, height: 200)
-        case .active, .paused: return CGSize(width: 120, height: 36)
+        case .active, .paused: return CGSize(width: 240, height: 36)
         case .completed: return CGSize(width: 280, height: 120)
         }
     }
@@ -191,8 +191,15 @@ struct DynamicIslandView: View {
     // MARK: - Compact Content
 
     private var compactContent: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 8) {
             PulsingDot(isPaused: sessionManager.state == .paused)
+
+            Text(sessionManager.taskName)
+                .font(.system(size: 13, weight: .medium, design: .rounded))
+                .foregroundStyle(.white.opacity(sessionManager.state == .paused ? 0.7 : 1.0))
+                .lineLimit(1)
+
+            Spacer(minLength: 4)
 
             Text(sessionManager.formattedTimeRemaining)
                 .font(.system(.body, design: .monospaced))
@@ -201,6 +208,7 @@ struct DynamicIslandView: View {
                 .contentTransition(.numericText())
                 .animation(.default, value: sessionManager.formattedTimeRemaining)
         }
+        .padding(.horizontal, 12)
         .transition(.opacity)
     }
 
