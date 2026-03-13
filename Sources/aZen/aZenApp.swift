@@ -17,6 +17,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let sessionManager = FocusSessionManager()
     private let hotkeyManager = HotkeyManager()
     private var cancellables = Set<AnyCancellable>()
+    private var openMenuItem: NSMenuItem?
+    private var shortcutPanel: ShortcutRecorderPanel?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.applicationIconImage = makeAppIcon()
@@ -35,14 +37,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         let menu = NSMenu()
-        menu.addItem(withTitle: "Open aZen (⌘⇧F)", action: #selector(openIsland), keyEquivalent: "")
+        let openItem = NSMenuItem(title: openMenuTitle(), action: #selector(openIsland), keyEquivalent: "")
+        menu.addItem(openItem)
+        openMenuItem = openItem
+        menu.addItem(withTitle: "Change Shortcut…", action: #selector(changeShortcut), keyEquivalent: "")
         menu.addItem(.separator())
         menu.addItem(withTitle: "Quit", action: #selector(quitApp), keyEquivalent: "q")
         statusItem.menu = menu
     }
 
+    private func openMenuTitle() -> String {
+        "Open aZen (\(hotkeyManager.config.displayString))"
+    }
+
     @objc private func openIsland() {
         toggleIsland()
+    }
+
+    @objc private func changeShortcut() {
+        let panel = ShortcutRecorderPanel()
+        panel.onShortcutCaptured = { [weak self] config in
+            self?.hotkeyManager.update(config: config)
+        }
+        panel.beginCapture()
+        shortcutPanel = panel
     }
 
     @objc private func quitApp() {
@@ -61,6 +79,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hotkeyManager.onHotkey = { [weak self] in
             Task { @MainActor in
                 self?.toggleIsland()
+            }
+        }
+        hotkeyManager.onConfigChanged = { [weak self] in
+            Task { @MainActor in
+                self?.openMenuItem?.title = self?.openMenuTitle() ?? "Open aZen"
             }
         }
         hotkeyManager.register()
