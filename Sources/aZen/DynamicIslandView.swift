@@ -263,12 +263,20 @@ private struct IslandTextField: View {
     @FocusState private var isFocused: Bool
 
     var body: some View {
-        TextField("", text: $text, prompt: Text(placeholder).foregroundStyle(.white.opacity(0.4)))
-            .textFieldStyle(.plain)
-            .font(.system(size: 14, weight: .medium, design: .rounded))
-            .foregroundStyle(.white)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
+        ZStack(alignment: .leading) {
+            if text.isEmpty {
+                Text(placeholder)
+                    .font(.system(size: 14, weight: .medium, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.4))
+                    .padding(.horizontal, 10)
+            }
+            TextField("", text: $text)
+                .textFieldStyle(.plain)
+                .font(.system(size: 14, weight: .medium, design: .rounded))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
+        }
             .background(
                 RoundedRectangle(cornerRadius: 8)
                     .fill(.white.opacity(0.12))
@@ -328,12 +336,19 @@ private struct IslandCustomDuration: View {
 
     var body: some View {
         HStack(spacing: 3) {
-            TextField("", text: $text, prompt: Text("00").foregroundStyle(.white.opacity(0.20)))
-                .textFieldStyle(.plain)
-                .font(.system(size: 11, weight: .medium, design: .monospaced))
-                .foregroundStyle(.white)
-                .frame(width: 26)
-                .multilineTextAlignment(.center)
+            ZStack {
+                if text.isEmpty {
+                    Text("00")
+                        .font(.system(size: 11, weight: .medium, design: .monospaced))
+                        .foregroundStyle(.white.opacity(0.3))
+                }
+                TextField("", text: $text)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 11, weight: .medium, design: .monospaced))
+                    .foregroundStyle(.white)
+                    .multilineTextAlignment(.center)
+            }
+            .frame(width: 26)
                 .focused($isFocused)
                 .onChange(of: text) { _, _ in onChanged() }
 
