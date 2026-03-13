@@ -1,0 +1,33 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and package
+        run: |
+          chmod +x build.sh
+          ./build.sh
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: build/aZen.dmg
+          body: |
+            ## Installation
+
+            1. Download `aZen.dmg`
+            2. Open the DMG and drag **aZen** to **Applications**
+            3. Launch aZen from Applications
+
+            > **Note:** This app is not notarized. If macOS says the app is damaged, run:
+            > ```
+            > xattr -cr /Applications/aZen.app
+            > ```
